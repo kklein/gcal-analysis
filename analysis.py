@@ -1,6 +1,7 @@
 import datetime
 import httplib2
 import matplotlib
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import os
 
@@ -21,7 +22,10 @@ except ImportError:
 SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Google Calendar API Python Quickstart'
-START_TIME = datetime.datetime(2016, 9, 10).isoformat()
+START_DATE = datetime.datetime(2016, 9, 10)
+# Events with colorcoding 'Flamingo', i.e. 4.
+SPORT_COLOR = '4'
+RUNNING_SUMMARY = 'Running'
 
 def get_credentials():
     """Gets valid user credentials from storage.
@@ -60,16 +64,17 @@ def dateToWeek(date, firstDate):
     return (int(date) - int(firstDate)) // 7
 
 def main():
-    """TODO(kkleindev)
+    """Obtains all events between START_DATE and current time and filters them
+    by indication of sports events. Provides simple plots.
     """
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('calendar', 'v3', http=http)
 
     # 'Z' indicates UTC time
-    timeStart = START_TIME + 'Z'
+    timeStart = START_DATE.isoformat() + 'Z'
     timeNow = datetime.datetime.utcnow().isoformat() + 'Z'
-    print('Getting the upcoming 10 events')
+
     eventsResult = service.events().list(
         calendarId='primary', timeMin=timeStart, timeMax = timeNow,
         maxResults=100000, singleEvents=True, orderBy='startTime').execute()
@@ -77,43 +82,57 @@ def main():
 
     print('Total number of events before filterting: ' + str(len(events)))
 
-    descriptionFilteredEvents = []
+    # Events with summary 'Running'.
+    summaryFilteredEvents = []
     colorFilteredEvents = []
-    intersection = []
     for event in events:
-        if 'summary' in event and event['summary'] == 'Running':
-            descriptionFilteredEvents.append(event)
-        if 'colorId' in event and event['colorId'] == '4':
+        if 'summary' in event and event['summary'] == RUNNING_SUMMARY:
+            summaryFilteredEvents.append(event)
+        if 'colorId' in event and event['colorId'] == SPORT_COLOR:
             colorFilteredEvents.append(event)
 
-    print('Total number of events with description Running: ' +
-        str(len(descriptionFilteredEvents)))
+    print('Total number of events with summary Running: ' +
+        str(len(summaryFilteredEvents)))
     print('Total number of events with color Flamingo: ' +
         str(len(colorFilteredEvents)))
 
+    # Plot1: Running distances.
     # Compute the running distance per week.
-    sportPerWeek = defaultdict(lambda: 0)
+    distancePerWeek = defaultdict(lambda: 0)
     firstDate = matplotlib.dates.datestr2num(
-        [descriptionFilteredEvents[0]['start']['dateTime']])
-    for event in descriptionFilteredEvents:
+        [summaryFilteredEvents[0]['start']['dateTime']])
+    lastDate = matplotlib.dates.datestr2num(
+        [summaryFilteredEvents[len(summaryFilteredEvents) - 1]['start']['dateTime']])
+    for week_id in range(dateToWeek(firstDate, firstDate), dateToWeek(lastDate, firstDate)):
+        distancePerWeek[week_id] = 0
+
+    for event in summaryFilteredEvents:
         if 'description' in event:
-            sportPerWeek[dateToWeek(
+            distancePerWeek[dateToWeek(
                 matplotlib.dates.datestr2num([event['start']['dateTime']]),
                 firstDate)] += descriptionToDistance(event['description'])
 
-    aggregatedWeekDates, aggregatedDistances = zip(*sportPerWeek.items())
-
+    aggregatedWeekDates, aggregatedDistances = zip(*distancePerWeek.items())
     averageDistance = sum(aggregatedDistances)/len(aggregatedDistances)
     print ('Average distance per week: ' + str(averageDistance))
 
-    plt.axhline(y=averageDistance, color='r', linestyle='-')
+    plt.axhline(y=averageDistance, color='r', linestyle='-', label='average distance')
+    plt.legend()
     plt.scatter(aggregatedWeekDates, aggregatedDistances)
+    plt.xlabel('week number since start date')
+    plt.ylabel('cumulative weekly distance [km]')
+    plt.title('Running distances since: ' + START_DATE.strftime('%Y %m %d'))
     plt.show()
 
+    # Plot2: Sports activities.
     # Compute the number of sport events per week.
     sportPerWeek = defaultdict(lambda: 0)
     firstDate = matplotlib.dates.datestr2num(
         [colorFilteredEvents[0]['start']['dateTime']])
+    lastDate = matplotlib.dates.datestr2num(
+        [colorFilteredEvents[len(colorFilteredEvents) - 1]['start']['dateTime']])
+    for week_id in range(dateToWeek(firstDate, firstDate), dateToWeek(lastDate, firstDate)):
+        sportPerWeek[week_id] = 0
     for event in colorFilteredEvents:
         sportPerWeek[dateToWeek(
             matplotlib.dates.datestr2num([event['start']['dateTime']]),
@@ -125,8 +144,13 @@ def main():
     print ('Average number of sports events per week: ' +
         str(averageSportsCount))
 
-    plt.axhline(y=averageSportsCount, color='r', linestyle='-')
+    plt.axhline(y=averageSportsCount, color='r', linestyle='-',
+        label='average #activities')
+    plt.legend()
     plt.scatter(aggregatedWeekDates, aggregatedSportCount)
+    plt.xlabel('week number since start date')
+    plt.ylabel('#weekly sports activities')
+    plt.title('Sport activities since: ' + START_DATE.strftime('%Y %m %d'))
     plt.show()
 
 if __name__ == '__main__':
