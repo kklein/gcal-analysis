@@ -48,16 +48,12 @@ def get_credentials():
         os.makedirs(credential_dir)
     credential_path = os.path.join(credential_dir,
                                    'calendar-python-quickstart.json')
-
     store = Storage(credential_path)
     credentials = store.get()
     if not credentials or credentials.invalid:
         flow = client.flow_from_clientsecrets(CLIENT_SECRET_FILE, SCOPES)
         flow.user_agent = APPLICATION_NAME
-        if flags:
-            credentials = tools.run_flow(flow, store, flags)
-        else: # Needed only for compatibility with Python 2.6
-            credentials = tools.run(flow, store)
+        credentials = tools.run_flow(flow, store)
         print('Storing credentials to ' + credential_path)
     return credentials
 
@@ -101,6 +97,7 @@ def get_accumulated_date_evaluations(events, compute_metric):
     dates = list(map(date_str_to_date, date_strings))
     weekly_dates = list(map(date_to_first_day_of_week, dates))
     evaluations = list(map(compute_metric, events))
+    # Set dictionary's default value to 0, allowing addition.
     dict = defaultdict(int)
     for (weekly_date, evaluation) in zip(weekly_dates, evaluations):
         dict[weekly_date] += evaluation
