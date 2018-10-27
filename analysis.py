@@ -1,16 +1,18 @@
 import datetime
-import httplib2
-import matplotlib
-import matplotlib.patches as mpatches
-import matplotlib.pyplot as plt
 import os
+from collections import defaultdict
+
+import httplib2
+import matplotlib.pyplot as plt
+import strict_rfc3339
 
 from apiclient import discovery
-from collections import defaultdict
+
 from oauth2client import client
 from oauth2client import tools
 from oauth2client.file import Storage
 
+#TODO(kkleindev): What's argparse?
 try:
     import argparse
     flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
@@ -19,13 +21,30 @@ except ImportError:
 
 # If modifying these scopes, delete your previously saved credentials
 # at ~/.credentials/calendar-python-quickstart.json
-SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
-CLIENT_SECRET_FILE = 'client_secret.json'
 APPLICATION_NAME = 'Google Calendar API Python Quickstart'
+CLIENT_SECRET_FILE = 'client_secret.json'
+SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
 START_DATE = datetime.datetime(2016, 9, 10)
-# Events with colorcoding 'Flamingo', i.e. 4.
-SPORT_COLOR = '4'
+# Events with colorcoding 'Flamingo'. 'Flamingo' is encoded as 4.
 RUNNING_SUMMARY = 'Running'
+SPORT_COLOR = '4'
+
+# Taken from https://mail.python.org/pipermail/tutor/2013-July/096752.html
+def ywd_to_date(year, week, weekday):
+    """Convert (year, week, isoweekday) tuple to a datetime.date().
+
+    >>> datetime.date(2013, 7, 12).isocalendar()
+    (2013, 28, 5)
+    >>> ywd_to_date(2013, 28, 5)
+    datetime.date(2013, 7, 12)
+    """
+    first = datetime.date(year, 1, 1)
+    first_year, _first_week, first_weekday = first.isocalendar()
+
+    if first_year == year:
+        week -= 1
+
+    return first + datetime.timedelta(days=week*7+weekday-first_weekday)
 
 def get_credentials():
     """Gets valid user credentials from storage.
@@ -55,103 +74,95 @@ def get_credentials():
         print('Storing credentials to ' + credential_path)
     return credentials
 
-def descriptionToDistance(description):
-    return float(description.split('km')[0])
-
-def dateToWeek(date, firstDate):
-    """Returns the week number of the date from firstDate.
-    """
-    return (int(date) - int(firstDate)) // 7
-
-def main():
-    """Obtains all events between START_DATE and current time and filters them
-    by indication of sports events. Provides simple plots.
-    """
+def get_events(timestamp_start, timestamp_end):
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
     service = discovery.build('calendar', 'v3', http=http)
-
-    # 'Z' indicates UTC time
-    timeStart = START_DATE.isoformat() + 'Z'
-    timeNow = datetime.datetime.utcnow().isoformat() + 'Z'
-
-    eventsResult = service.events().list(
-        calendarId='primary', timeMin=timeStart, timeMax = timeNow,
+    events_result = service.events().list(
+        calendarId='primary', timeMin=timestamp_start, timeMax=timestamp_end,
         maxResults=100000, singleEvents=True, orderBy='startTime').execute()
-    events = eventsResult.get('items', [])
+    return events_result.get('items', [])
 
+def summary_filter(event):
+    return ('summary' in event and
+            'description' in event and
+            event['summary'] == RUNNING_SUMMARY)
+
+def color_filter(event):
+    return 'colorId' in event and event['colorId'] == SPORT_COLOR
+
+def date_str_to_date(date_str):
+    timestamp = strict_rfc3339.rfc3339_to_timestamp(date_str)
+    return datetime.date.fromtimestamp(timestamp)
+
+def date_to_first_day_of_week(date):
+    year, week = date.isocalendar()[0:2]
+    day = 0
+    return ywd_to_date(year, week, day)
+
+def compute_distance_metric(event):
+    return float(event['description'].split('km')[0])
+
+def compute_count_metric(event):
+    return 1
+
+# TODO(kkleindev): Consider filling up weeks with 0 events as to paint a more
+# 'complete' picture.
+# Metric has to cummulative via addition.
+def get_accumulated_date_evaluations(events, compute_metric):
+    date_strings = list(map(lambda x: x['start']['dateTime'], events))
+    dates = list(map(date_str_to_date, date_strings))
+    weekly_dates = list(map(date_to_first_day_of_week, dates))
+    evaluations = list(map(compute_metric, events))
+    dict = defaultdict(int)
+    for (weekly_date, evaluation) in zip(weekly_dates, evaluations):
+        dict[weekly_date] += evaluation
+    return list(dict.keys()), list(dict.values())
+
+def plot_weekly_evaluations(week_dates, aggregated_evaluations,
+                            unit_description, unit=None):
+    if unit is None:
+        unit_string = ''
+    else:
+        unit_string = '[%s]' % unit
+
+    average_evaluation = sum(aggregated_evaluations) / len(aggregated_evaluations)
+    plt.plot_date(x=week_dates, y=aggregated_evaluations, xdate=True,
+                  ydate=False)
+    plt.axhline(y=average_evaluation, color='r', linestyle='-',
+                label='Average %s %.2f %s' %
+                (unit_description, average_evaluation, unit_string))
+    plt.ylabel('Cumulative weekly %ss %s' % (unit_description, unit_string))
+    plt.title('Weekly %s since: %s' %
+              (unit_description, START_DATE.strftime('%Y %m %d')))
+    plt.legend()
+    plt.show()
+
+def main():
+    """Obtain all events between START_DATE and current time. Filters them
+    by indication of sport events. Provide simple plots.
+    """
+    # 'Z' indicates UTC time
+    timestamp_start = START_DATE.isoformat() + 'Z'
+    timestamp_now = datetime.datetime.utcnow().isoformat() + 'Z'
+    events = get_events(timestamp_start, timestamp_now)
     print('Total number of events before filterting: ' + str(len(events)))
 
-    # Events with summary 'Running'.
-    summaryFilteredEvents = []
-    colorFilteredEvents = []
-    for event in events:
-        if 'summary' in event and event['summary'] == RUNNING_SUMMARY:
-            summaryFilteredEvents.append(event)
-        if 'colorId' in event and event['colorId'] == SPORT_COLOR:
-            colorFilteredEvents.append(event)
+    # Running part.
+    summary_filtered_events = list(filter(summary_filter, events))
+    print('Total number of events with summary Running: %d' %
+          len(summary_filtered_events))
+    dates, distances = get_accumulated_date_evaluations(
+        summary_filtered_events, compute_distance_metric)
+    plot_weekly_evaluations(dates, distances, 'running distance', 'km')
 
-    print('Total number of events with summary Running: ' +
-        str(len(summaryFilteredEvents)))
-    print('Total number of events with color Flamingo: ' +
-        str(len(colorFilteredEvents)))
-
-    # Plot1: Running distances.
-    # Compute the running distance per week.
-    distancePerWeek = defaultdict(lambda: 0)
-    firstDate = matplotlib.dates.datestr2num(
-        [summaryFilteredEvents[0]['start']['dateTime']])
-    lastDate = matplotlib.dates.datestr2num(
-        [summaryFilteredEvents[len(summaryFilteredEvents) - 1]['start']['dateTime']])
-    for week_id in range(dateToWeek(firstDate, firstDate), dateToWeek(lastDate, firstDate)):
-        distancePerWeek[week_id] = 0
-
-    for event in summaryFilteredEvents:
-        if 'description' in event:
-            distancePerWeek[dateToWeek(
-                matplotlib.dates.datestr2num([event['start']['dateTime']]),
-                firstDate)] += descriptionToDistance(event['description'])
-
-    aggregatedWeekDates, aggregatedDistances = zip(*distancePerWeek.items())
-    averageDistance = sum(aggregatedDistances)/len(aggregatedDistances)
-    print ('Average distance per week: ' + str(averageDistance))
-
-    plt.axhline(y=averageDistance, color='r', linestyle='-', label='average distance')
-    plt.legend()
-    plt.scatter(aggregatedWeekDates, aggregatedDistances)
-    plt.xlabel('week number since start date')
-    plt.ylabel('cumulative weekly distance [km]')
-    plt.title('Running distances since: ' + START_DATE.strftime('%Y %m %d'))
-    plt.show()
-
-    # Plot2: Sports activities.
-    # Compute the number of sport events per week.
-    sportPerWeek = defaultdict(lambda: 0)
-    firstDate = matplotlib.dates.datestr2num(
-        [colorFilteredEvents[0]['start']['dateTime']])
-    lastDate = matplotlib.dates.datestr2num(
-        [colorFilteredEvents[len(colorFilteredEvents) - 1]['start']['dateTime']])
-    for week_id in range(dateToWeek(firstDate, firstDate), dateToWeek(lastDate, firstDate)):
-        sportPerWeek[week_id] = 0
-    for event in colorFilteredEvents:
-        sportPerWeek[dateToWeek(
-            matplotlib.dates.datestr2num([event['start']['dateTime']]),
-            firstDate)] += 1
-
-    aggregatedWeekDates, aggregatedSportCount = zip(*sportPerWeek.items())
-
-    averageSportsCount = len(colorFilteredEvents) / len(aggregatedWeekDates)
-    print ('Average number of sports events per week: ' +
-        str(averageSportsCount))
-
-    plt.axhline(y=averageSportsCount, color='r', linestyle='-',
-        label='average #activities')
-    plt.legend()
-    plt.scatter(aggregatedWeekDates, aggregatedSportCount)
-    plt.xlabel('week number since start date')
-    plt.ylabel('#weekly sports activities')
-    plt.title('Sport activities since: ' + START_DATE.strftime('%Y %m %d'))
-    plt.show()
+    # Sport activities part.
+    color_filtered_events = list(filter(color_filter, events))
+    print('Total number of events with color Flamingo: %d' %
+          len(color_filtered_events))
+    dates, counts = get_accumulated_date_evaluations(
+        color_filtered_events, compute_count_metric)
+    plot_weekly_evaluations(dates, counts, 'activity count')
 
 if __name__ == '__main__':
     main()
