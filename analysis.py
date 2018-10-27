@@ -5,25 +5,17 @@ from collections import defaultdict
 import httplib2
 import matplotlib.pyplot as plt
 import strict_rfc3339
-
 from apiclient import discovery
-
 from oauth2client import client
 from oauth2client import tools
 from oauth2client.file import Storage
-
-#TODO(kkleindev): What's argparse?
-try:
-    import argparse
-    flags = argparse.ArgumentParser(parents=[tools.argparser]).parse_args()
-except ImportError:
-    flags = None
 
 # If modifying these scopes, delete your previously saved credentials
 # at ~/.credentials/calendar-python-quickstart.json
 APPLICATION_NAME = 'Google Calendar API Python Quickstart'
 CLIENT_SECRET_FILE = 'client_secret.json'
 SCOPES = 'https://www.googleapis.com/auth/calendar.readonly'
+
 START_DATE = datetime.datetime(2016, 9, 10)
 # Events with colorcoding 'Flamingo'. 'Flamingo' is encoded as 4.
 RUNNING_SUMMARY = 'Running'
@@ -32,7 +24,6 @@ SPORT_COLOR = '4'
 # Taken from https://mail.python.org/pipermail/tutor/2013-July/096752.html
 def ywd_to_date(year, week, weekday):
     """Convert (year, week, isoweekday) tuple to a datetime.date().
-
     >>> datetime.date(2013, 7, 12).isocalendar()
     (2013, 28, 5)
     >>> ywd_to_date(2013, 28, 5)
@@ -40,18 +31,14 @@ def ywd_to_date(year, week, weekday):
     """
     first = datetime.date(year, 1, 1)
     first_year, _first_week, first_weekday = first.isocalendar()
-
     if first_year == year:
         week -= 1
-
     return first + datetime.timedelta(days=week*7+weekday-first_weekday)
 
 def get_credentials():
     """Gets valid user credentials from storage.
-
     If nothing has been stored, or if the stored credentials are invalid,
     the OAuth2 flow is completed to obtain the new credentials.
-
     Returns:
         Credentials, the obtained credential.
     """
@@ -108,7 +95,7 @@ def compute_count_metric(event):
 
 # TODO(kkleindev): Consider filling up weeks with 0 events as to paint a more
 # 'complete' picture.
-# Metric has to cummulative via addition.
+# Metric has to be cummulative via addition.
 def get_accumulated_date_evaluations(events, compute_metric):
     date_strings = list(map(lambda x: x['start']['dateTime'], events))
     dates = list(map(date_str_to_date, date_strings))
