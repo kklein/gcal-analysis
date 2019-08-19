@@ -1,26 +1,52 @@
+* {
+ font: 16px sans-serif;
+}
+
 .datapoint {
   fill: white;
   stroke: steelblue;
   stroke-width: 1.5px;
 }
 
-div.tooltip {
+.axis--x {
+  font: 16px sans-serif;
+}
+
+.axis--y {
+  font: 16px sans-serif;
+}
+
+#tooltip {
     position: absolute;
     text-align: center;
-    width: 60px;
-    height: 28px;
-    padding: 2px;
-    font: 12px sans-serif;
-    background: lightsteelblue;
+    width: 80px;
+    height: 16px;
+    padding: 5px;
+    background: steelblue;
     border: 0px;
-    border-radius: 8px;
+    border-radius: 5px;
     pointer-events: none;
+    color: white;
+    opacity: 0;
+}
+
+.aggregate_panel {
+  position: absolute;
+  display: flex;
+  flex-direction: row;
+  top: 40px;
+  left: 80px;
+  color: white;
+  background-color: lightgrey;
+  padding: 5px;
+  border-radius: 5px;
 }
 
 /* The switch - the box around the slider */
 .switch {
   position: relative;
   display: inline-block;
+  margin-left: 5px;
   width: 60px;
   height: 34px;
 }
@@ -40,7 +66,7 @@ div.tooltip {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
+  background-color: lightgrey;
   -webkit-transition: .4s;
   transition: .4s;
 }
@@ -58,11 +84,11 @@ div.tooltip {
 }
 
 input:checked + .slider {
-  background-color: #2196F3;
+  background-color: steelblue;
 }
 
 input:focus + .slider {
-  box-shadow: 0 0 1px #2196F3;
+  box-shadow: 0 0 1px steelblue;
 }
 
 input:checked + .slider:before {

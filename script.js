@@ -6,9 +6,8 @@ const DISCOVERY_DOCS = ['https://www.googleapis.com/discovery/v1/apis/calendar/v
 const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
 
 const authorizeButton = document.getElementById('authorize_button');
-const signoutButton = document.getElementById('signout_button');
 
-let state = true;
+const startDate = new Date(2016, 9, 10);
 
 /**
  *  On load, called to load the auth2 library and API client library.
@@ -46,7 +45,6 @@ function initClient() {
     // Handle the initial sign-in state.
     updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
     authorizeButton.onclick = handleAuthClick;
-    signoutButton.onclick = handleSignoutClick;
   }, (error) =>
     appendPre(JSON.stringify(error, null, 2))
   );
@@ -59,11 +57,9 @@ function initClient() {
 function updateSigninStatus(isSignedIn) {
   if (isSignedIn) {
     authorizeButton.style.display = 'none';
-    signoutButton.style.display = 'none';
-    displayEvents(document.getElementById('aggregate_checkbox').checked);
+    initializeVisualizion();
   } else {
     authorizeButton.style.display = 'block';
-    signoutButton.style.display = 'none';
   }
 }
 
@@ -74,12 +70,6 @@ function handleAuthClick(event) {
   gapi.auth2.getAuthInstance().signIn();
 }
 
-/**
- *  Sign out the user upon button click.
- */
-function handleSignoutClick(event) {
-  gapi.auth2.getAuthInstance().signOut();
-}
 
 /**
  *  Given an event object, return a date object indicating its start.
@@ -90,19 +80,6 @@ function extractDate(event) {
   }
   return new Date(event.start.date);
 }
-
-
-const checkbox = document.getElementById('aggregate_checkbox');
-
-checkbox.addEventListener('change', (event) => {
-  // First get rid off previous visalization.
-  const svg = document.querySelector('svg');
-  const children = Array.from(svg.childNodes);
-  children.forEach((child) =>
-    child.parentNode.removeChild(child)
-  );
-  displayEvents(event.target.checked);
-});
 
 function createWeeklyAggregates(data) {
   return d3.nest()
@@ -116,10 +93,6 @@ function createWeeklyAggregates(data) {
         };
       });
 }
-
-const tooltip = d3.select('body').append('div')
-    .attr('class', 'tooltip')
-    .style('opacity', 0);
 
 function fillUpWeeks(data) {
   const firstDate = data[0].x;
@@ -135,15 +108,115 @@ function fillUpWeeks(data) {
   return data;
 }
 
-/**
- * Print the summary and start datetime/date of the next ten events in
- * the authorized user's calendar. If no events are found an
- * appropriate message is printed.
- */
-function displayEvents(useAggregate) {
+function selectDataSet(checked, dailyData, weeklyData) {
+  return checked ? weeklyData : dailyData;
+}
+
+function getReactToZoom(circleContainer, xScaler, xAxis) {
+  return () => {
+    const t = d3.event.transform;
+    const xt = t.rescaleX(xScaler);
+    circleContainer.select('.axis--x').call(xAxis.scale(xt));
+    circleContainer.selectAll('circle')
+        .attr('cx', (d) => xt(d.x));
+  };
+}
+
+function initiateZoom(width, height, circleContainer, xScaler, xAxis) {
+  return d3.zoom()
+      .scaleExtent([1, 32])
+      .translateExtent([[0, 0], [width, height]])
+      .extent([[0, 0], [width, height]])
+      .on('zoom', getReactToZoom(circleContainer, xScaler, xAxis));
+}
+
+function displayData(data) {
+  const tooltip = d3.select('#tooltip');
+
+  const svg = d3.select('svg');
+  const margin = {top: 20, right: 20, bottom: 30, left: 60};
+  const width = +svg.attr('width') - margin.left - margin.right;
+  const height = +svg.attr('height') - margin.top - margin.bottom;
+
+  console.log(height);
+
+  const translation = 'translate(' + margin.left + ',' + margin.top
+      + ')';
+
+  const xScaler = d3.scaleTime()
+      .domain(d3.extent(data, (d) => d.x))
+      .range([0, width]);
+
+  const yScaler = d3.scaleLinear()
+      .domain(d3.extent(data, (d) => d.y))
+      .range([height, 0]);
+
+  const xAxis = d3.axisBottom(xScaler);
+  const yAxis = d3.axisLeft(yScaler);
+
+  // Define the area of the svg that can be 'used' and will not be
+  // clipped.
+  svg.append('defs')
+      .append('clipPath')
+      .attr('transform', translation)
+      .attr('id', 'clip')
+      .append('rect')
+      .attr('width', width)
+      .attr('height', height);
+
+  // Define child of svg that will actually contain elements.
+  const g = svg.append('g')
+      .attr('transform', translation);
+
+  g.append('g')
+      .attr('class', 'axis axis--x')
+      .attr('transform', 'translate(0,' + height + ')')
+      .call(xAxis);
+
+  g.append('g')
+      .attr('class', 'axis axis--y')
+      .call(yAxis);
+
+  g.append('g')
+      .attr('clip-path', 'url(#clip)')
+      .selectAll('.circle')
+      .data(data)
+      .enter()
+      .append('circle')
+      .attr('class', 'datapoint')
+      .attr('cx', (d) => xScaler(d.x))
+      .attr('cy', (d) => yScaler(d.y))
+      .attr('r', 3.5)
+      .on('mouseover', (d) => {
+        tooltip.transition()
+            .duration(200)
+            .style('opacity', .9);
+        tooltip.html(d.y.toFixed(2) + 'km')
+            .style('left', (d3.event.pageX) + 'px')
+            .style('top', (d3.event.pageY - 28) + 'px');
+      })
+      .on('mouseout', (d) => {
+        tooltip.transition()
+            .duration(500)
+            .style('opacity', 0);
+      });
+
+  // Bind zooming to svg.
+  svg.call(initiateZoom(width, height, g, xScaler, xAxis)).transition();
+
+  // Add label to x-axis.
+  svg.append('text')
+      .attr('transform', 'rotate(-90)')
+      .attr('y', 20)
+      .attr('x', 0 - (height / 2))
+      .style('text-anchor', 'middle')
+      .text('distance [km]');
+}
+
+function initializeVisualizion() {
   gapi.client.calendar.events.list({
     'calendarId': 'primary',
-    'timeMin': (new Date(2016, 9, 10)).toISOString(),
+    'timeMin': startDate.toISOString(),
     'timeMax': (new Date()).toISOString(),
     'showDeleted': false,
     'singleEvents': true,
@@ -161,97 +234,29 @@ function displayEvents(useAggregate) {
         event.distance = event.description.split(' ')[0];
       });
 
-      let data = d3.range(events.length).map((i) => {
+      const dailyData = d3.range(events.length).map((i) => {
         return {
           x: events[i].date,
           y: +events[i].distance};
       });
+      const weeklyData = fillUpWeeks(createWeeklyAggregates(dailyData));
 
-      if (useAggregate) {
-        data = createWeeklyAggregates(data);
-        data = fillUpWeeks(data);
-      }
+      const checkbox = document.getElementById('aggregate_checkbox');
 
-      const svg = d3.select('svg');
-      const margin = {top: 20, right: 20, bottom: 30, left: 40};
-      const width = +svg.attr('width') - margin.left - margin.right;
-      const height = +svg.attr('height') - margin.top - margin.bottom;
+      checkbox.addEventListener('change', (event) => {
+        // First get rid off previous visalization.
+        const svg = document.querySelector('svg');
+        const children = Array.from(svg.childNodes);
+        children.forEach((child) =>
+          child.parentNode.removeChild(child)
+        );
 
-      const translation = 'translate(' + margin.left + ',' + margin.top
-          + ')';
+        const data = selectDataSet(event.target.checked, dailyData, weeklyData);
+        displayData(data);
+      });
 
-      const xScaler = d3.scaleTime()
-          .domain([new Date(2016, 9, 10), new Date()])
-          .range([0, width]);
-
-      const yScaler = d3.scaleLinear()
-          .domain(d3.extent(data, (d) => d.y))
-          .range([height, 0]);
-
-      const xAxis = d3.axisBottom(xScaler);
-      const yAxis = d3.axisLeft(yScaler);
-
-      const initiateZoom = d3.zoom()
-          .scaleExtent([1, 32])
-          .translateExtent([[0, 0], [width, height]])
-          .extent([[0, 0], [width, height]])
-          .on('zoom', reactToZoom);
-
-      // Define the area of the svg that can be 'used' and will not be
-      // clipped.
-      svg.append('defs').append('clipPath')
-          .attr('transform', translation)
-          .attr('id', 'clip')
-          .append('rect')
-          .attr('width', width)
-          .attr('height', height);
-
-      // Define child of svg that will actually contain elements.
-      const g = svg.append('g')
-          .attr('transform', translation);
-
-      g.append('g')
-          .attr('class', 'axis axis--x')
-          .attr('transform', 'translate(0,' + height + ')')
-          .call(xAxis);
-
-      g.append('g')
-          .attr('class', 'axis axis--y')
-          .call(yAxis);
-
-      g.append('g')
-          .attr('clip-path', 'url(#clip)')
-          .selectAll('.circle')
-          .data(data)
-          .enter().append('circle')
-          .attr('class', 'datapoint')
-          .attr('cx', (d) => xScaler(d.x))
-          .attr('cy', (d) => yScaler(d.y))
-          .attr('r', 3.5)
-          .on('mouseover', (d) => {
-            tooltip.transition()
-                .duration(200)
-                .style('opacity', .9);
-            tooltip.html(d.y.toFixed(2) + 'km')
-                .style('left', (d3.event.pageX) + 'px')
-                .style('top', (d3.event.pageY - 28) + 'px');
-          })
-          .on('mouseout', (d) => {
-            tooltip.transition()
-                .duration(500)
-                .style('opacity', 0);
-          });
-
-      // Bind zooming to svg.
-      svg.call(initiateZoom).transition();
-
-      function reactToZoom() {
-        const t = d3.event.transform;
-        const xt = t.rescaleX(xScaler);
-        g.select('.axis--x').call(xAxis.scale(xt));
-        g.selectAll('circle')
-            .attr('cx', (d) => xt(d.x));
-      }
+      const data = selectDataSet(checkbox.checked, dailyData, weeklyData);
+      displayData(data);
     }
   });
 }

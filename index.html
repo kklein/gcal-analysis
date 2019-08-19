@@ -1,25 +1,25 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Google Calendar API Quickstart</title>
+    <title>Gcal Analysis: Runs</title>
     <meta charset="utf-8" />
   </head>
   <link rel="stylesheet" href="style.css">
   <body>
-    <svg width="960" height="500"></svg>
-
-    <!--Add buttons to initiate auth sequence and sign out-->
+    <svg width="900" height="600"></svg>
     <button id="authorize_button" style="display: none;">Authorize</button>
     <button id="signout_button" style="display: none;">Sign Out</button>
-    <div>
-      Aggregate by week:
+    <div id="tooltip">
     </div>
-    <label class="switch">
-      <input id="aggregate_checkbox" type="checkbox" checked>
-      <span class="slider round"></span>
-    </label>
-    <pre id="content" style="white-space: pre-wrap;"></pre>
-    <div id="wrapper"></div>
+    <div class="aggregate_panel">
+      <p style="text-align:center; margin: auto;">
+        Aggregate by week:
+      </p>
+      <label class="switch">
+        <input id="aggregate_checkbox" type="checkbox" checked>
+        <span class="slider round"></span>
+      </label>
+    </div>
 
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script src="./secret.js"></script>
