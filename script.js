@@ -118,6 +118,10 @@ function createWeeklyAggregates(data) {
       });
 }
 
+const tooltip = d3.select('body').append('div')
+    .attr('class', 'tooltip')
+    .style('opacity', 0);
+
 /**
  * Print the summary and start datetime/date of the next ten events in
  * the authorized user's calendar. If no events are found an
@@ -132,17 +136,17 @@ function displayEvents(useAggregate) {
     'singleEvents': true,
     'maxResults': 10000,
     'orderBy': 'startTime',
-  }).then(function(response) {
+  }).then((response) => {
     // Filter and process calendar events.
     let events = response.result.items;
     if (events.length > 0) {
-      events = events.filter((x) => x.summary == 'Running');
-      events = events.filter((x) => typeof x.description !== 'undefined');
-      for (i = 0; i < events.length; i++) {
-        const event = events[i];
+      events = events.filter((event) => event.summary == 'Running');
+      events = events.filter(
+          (event) => typeof event.description !== 'undefined');
+      events.forEach((event) => {
         event.date = extractDate(event);
         event.distance = event.description.split(' ')[0];
-      }
+      });
 
       let data = d3.range(events.length).map((i) => {
         return {
@@ -173,11 +177,11 @@ function displayEvents(useAggregate) {
       const xAxis = d3.axisBottom(xScaler);
       const yAxis = d3.axisLeft(yScaler);
 
-      const zoom = d3.zoom()
+      const initiateZoom = d3.zoom()
           .scaleExtent([1, 32])
           .translateExtent([[0, 0], [width, height]])
           .extent([[0, 0], [width, height]])
-          .on('zoom', zoomed);
+          .on('zoom', reactToZoom);
 
       // Define the area of the svg that can be 'used' and will not be
       // clipped.
@@ -187,20 +191,6 @@ function displayEvents(useAggregate) {
           .append('rect')
           .attr('width', width)
           .attr('height', height);
-
-      const tip = svg.append('div')
-          .attr('class', 'p')
-          .html('I am a tooltip...')
-          .style('border', '1px solid steelblue')
-          .style('padding', '5px')
-          .style('position', 'absolute')
-          .style('display', 'none')
-          .on('mouseover', function(d, i) {
-            tip.transition().duration(0);
-          })
-          .on('mouseout', function(d, i) {
-            tip.style('display', 'none');
-          });
 
       // Define child of svg that will actually contain elements.
       const g = svg.append('g')
@@ -224,22 +214,24 @@ function displayEvents(useAggregate) {
           .attr('cx', (d) => xScaler(d.x))
           .attr('cy', (d) => yScaler(d.y))
           .attr('r', 3.5)
-          .on('mouseout', function(d, i) {
-            tip.transition()
-                .delay(500)
-                .style('display', 'none');
+          .on('mouseover', (d) => {
+            tooltip.transition()
+                .duration(200)
+                .style('opacity', .9);
+            tooltip.html(d.y.toFixed(2))
+                .style('left', (d3.event.pageX) + 'px')
+                .style('top', (d3.event.pageY - 28) + 'px');
+          })
+          .on('mouseout', (d) => {
+            tooltip.transition()
+                .duration(500)
+                .style('opacity', 0);
           });
 
-      // This rect is only meant to trigger zoom/pan events.
-      svg.append('rect')
-          .attr('width', width)
-          .attr('height', height)
-          .style('fill', 'none')
-          .style('pointer-events', 'all')
-          .attr('transform', translation)
-          .call(zoom);
+      // Bind zooming to svg.
+      svg.call(initiateZoom).transition();
 
-      function zoomed() {
+      function reactToZoom() {
         const t = d3.event.transform;
         const xt = t.rescaleX(xScaler);
         g.select('.axis--x').call(xAxis.scale(xt));
