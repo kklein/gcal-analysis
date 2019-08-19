@@ -8,11 +8,25 @@ const SCOPES = "https://www.googleapis.com/auth/calendar.readonly";
 const authorizeButton = document.getElementById('authorize_button');
 const signoutButton = document.getElementById('signout_button');
 
+var state = true;
+
 /**
  *  On load, called to load the auth2 library and API client library.
  */
 function handleClientLoad() {
   gapi.load('client:auth2', initClient);
+}
+
+/**
+ * Append a pre element to the body containing the given message
+ * as its text node. Used to display the results of the API call.
+ *
+ * @param {string} message Text to be placed in pre element.
+ */
+function appendPre(message) {
+  var pre = document.getElementById('content');
+  var textContent = document.createTextNode(message + '\n');
+  pre.appendChild(textContent);
 }
 
 /**
@@ -46,7 +60,7 @@ function updateSigninStatus(isSignedIn) {
   if (isSignedIn) {
     authorizeButton.style.display = 'none';
     signoutButton.style.display = 'block';
-    displayEvents();
+    displayEvents(state);
   } else {
     authorizeButton.style.display = 'block';
     signoutButton.style.display = 'none';
@@ -77,12 +91,24 @@ function extractDate(event) {
   return new Date(event.start.date);
 }
 
+
+aggregateButton = document.getElementById('aggregate_button');
+aggregateButton.onclick = () => {
+  state = !state;
+  const svg = document.querySelector('svg');
+  const children = Array.from(svg.childNodes);
+  children.forEach((child) =>
+    child.parentNode.removeChild(child)
+  )
+  displayEvents(state);
+}
+
 /**
  * Print the summary and start datetime/date of the next ten events in
  * the authorized user's calendar. If no events are found an
  * appropriate message is printed.
  */
-function displayEvents() {
+function displayEvents(use_aggregate) {
 
   gapi.client.calendar.events.list({
     'calendarId': 'primary',
@@ -105,11 +131,27 @@ function displayEvents() {
         event.distance = event.description.split(" ")[0];
       }
 
-
-      const data = d3.range(events.length).map(i => {
+      var data = d3.range(events.length).map(i => {
         return {x: events[i].date,
                 y: +events[i].distance}
       })
+
+      if (use_aggregate) {
+        data = d3.nest()
+          .key(function(d){
+            return d3.timeWeek(d.x);
+          })
+          .rollup(function(leaves){
+            return d3.sum(leaves, function(d) {return (d.y)});
+          })
+          .entries(data)
+          .map(function(datum) {
+            return {
+              x: new Date(datum.key),
+              y: datum.value,
+            }
+          })
+      }
 
       const svg = d3.select("svg"),
           margin = {top: 20, right: 20, bottom: 30, left: 40},
@@ -124,7 +166,7 @@ function displayEvents() {
           .range([0, width]);
 
       const y = d3.scaleLinear()
-          .domain(d3.extent(data, datum => datum.y))
+          .domain(d3.extent(data, d => d.y))
           .range([height, 0]);
 
       const xAxis = d3.axisBottom(x),
@@ -150,6 +192,20 @@ function displayEvents() {
           .attr("width", width)
           .attr("height", height);
 
+      var tip = svg.append('div')
+       .attr('class', 'p')
+       .html('I am a tooltip...')
+       .style('border', '1px solid steelblue')
+       .style('padding', '5px')
+       .style('position', 'absolute')
+       .style('display', 'none')
+       .on('mouseover', function(d, i) {
+         tip.transition().duration(0);
+       })
+       .on('mouseout', function(d, i) {
+         tip.style('display', 'none');
+       });
+
       // Define child of svg that will actually contain elements.
       const g = svg.append("g")
           .attr("transform", translation);
@@ -166,12 +222,17 @@ function displayEvents() {
       g.append('g')
           .attr("clip-path", "url(#clip)")
           .selectAll(".circle")
-          .data(data.filter(function(d) { return d; }))
+          .data(data)
           .enter().append("circle")
           .attr("class", "datapoint")
-          .attr("cx", line.x())
-          .attr("cy", line.y())
-          .attr("r", 3.5);
+          .attr("cx", function(d) {return x(d.x)})
+          .attr("cy", function(d) {return y(d.y)})
+          .attr("r", 3.5)
+          .on('mouseout', function(d, i) {
+              tip.transition()
+              .delay(500)
+              .style('display', 'none');
+          })
 
       // This rect is only meant to trigger zoom/pan events.
       svg.append("rect")
@@ -182,12 +243,14 @@ function displayEvents() {
         .attr('transform', translation)
         .call(zoom);
 
+
+
       function zoomed() {
         const t = d3.event.transform;
         const xt = t.rescaleX(x);
         g.select(".axis--x").call(xAxis.scale(xt));
         g.selectAll('circle')
-          .attr('cx', function(d) {return xt(d.x)});
+          .attr('cx', function(d) {return xt(new Date(d.key))});
       }
     }
   });
