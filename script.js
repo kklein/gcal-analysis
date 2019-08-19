@@ -122,6 +122,20 @@ const tooltip = d3.select('body').append('div')
     .attr('class', 'tooltip')
     .style('opacity', 0);
 
+function fillUpWeeks(data) {
+  const firstDate = data[0].x;
+  const lastDate = data[data.length-1].x;
+  const allDates = d3.timeWeek.range(firstDate, lastDate);
+
+  // The conversion to strings is necessary as Object equality won't work with
+  // 'includes'.
+  const presentDates = data.map((d) => d.x.toString());
+  const newDates = allDates.filter((d) => !presentDates.includes(d.toString()));
+
+  newDates.forEach((d) => data.push({x: d, y: 0}));
+  return data;
+}
+
 /**
  * Print the summary and start datetime/date of the next ten events in
  * the authorized user's calendar. If no events are found an
@@ -156,7 +170,10 @@ function displayEvents(useAggregate) {
 
       if (useAggregate) {
         data = createWeeklyAggregates(data);
+        data = fillUpWeeks(data);
       }
+
+      console.log(data);
 
       const svg = d3.select('svg');
       const margin = {top: 20, right: 20, bottom: 30, left: 40};

@@ -27,3 +27,5 @@ Inspiration:
 - https://bl.ocks.org/mbostock/431a331294d2b5ddd33f947cf4c81319
 - https://stackoverflow.com/questions/41196044/get-iso-week-day-and-week-of-year-in-d3
 - http://learnjsdata.com/group_data.html
+- https://www.d3-graph-gallery.com/graph/barplot_button_data_hard.html
+- http://bl.ocks.org/d3noob/a22c42db65eb00d4e369
