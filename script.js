@@ -59,8 +59,8 @@ function initClient() {
 function updateSigninStatus(isSignedIn) {
   if (isSignedIn) {
     authorizeButton.style.display = 'none';
-    signoutButton.style.display = 'block';
-    displayEvents(state);
+    signoutButton.style.display = 'none';
+    displayEvents(document.getElementById('aggregate_checkbox').checked);
   } else {
     authorizeButton.style.display = 'block';
     signoutButton.style.display = 'none';
@@ -92,18 +92,17 @@ function extractDate(event) {
 }
 
 
-aggregateButton = document.getElementById('aggregate_button');
-aggregateButton.onclick = () => {
-  state = !state;
+const checkbox = document.getElementById('aggregate_checkbox');
+
+checkbox.addEventListener('change', (event) => {
   // First get rid off previous visalization.
   const svg = document.querySelector('svg');
   const children = Array.from(svg.childNodes);
   children.forEach((child) =>
     child.parentNode.removeChild(child)
   );
-
-  displayEvents(state);
-};
+  displayEvents(event.target.checked);
+});
 
 function createWeeklyAggregates(data) {
   return d3.nest()
@@ -173,8 +172,6 @@ function displayEvents(useAggregate) {
         data = fillUpWeeks(data);
       }
 
-      console.log(data);
-
       const svg = d3.select('svg');
       const margin = {top: 20, right: 20, bottom: 30, left: 40};
       const width = +svg.attr('width') - margin.left - margin.right;
@@ -235,7 +232,7 @@ function displayEvents(useAggregate) {
             tooltip.transition()
                 .duration(200)
                 .style('opacity', .9);
-            tooltip.html(d.y.toFixed(2))
+            tooltip.html(d.y.toFixed(2) + 'km')
                 .style('left', (d3.event.pageX) + 'px')
                 .style('top', (d3.event.pageY - 28) + 'px');
           })

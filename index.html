@@ -11,8 +11,13 @@
     <!--Add buttons to initiate auth sequence and sign out-->
     <button id="authorize_button" style="display: none;">Authorize</button>
     <button id="signout_button" style="display: none;">Sign Out</button>
-    <button id="aggregate_button">Aggregate</button>
-
+    <div>
+      Aggregate by week:
+    </div>
+    <label class="switch">
+      <input id="aggregate_checkbox" type="checkbox" checked>
+      <span class="slider round"></span>
+    </label>
     <pre id="content" style="white-space: pre-wrap;"></pre>
     <div id="wrapper"></div>
 
