@@ -178,7 +178,6 @@ function displayData(data) {
       .call(yAxis);
 
   g.append('g')
-      .attr('clip-path', 'url(#clip)')
       .selectAll('.circle')
       .data(data)
       .enter()
