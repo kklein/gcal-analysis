@@ -1,9 +1,12 @@
 import pandas as pd
 
+
 def get_dataframe(events):
     d = {
         "date_string": map(lambda event: event["start"]["dateTime"], events),
-        "distance": map(lambda event: event.get("description", "").split("km")[0], events),
+        "distance": map(
+            lambda event: event.get("description", "").split("km")[0], events
+        ),
     }
     df = pd.DataFrame(data=d)
     df["date"] = pd.to_datetime(df["date_string"].str[:16])
