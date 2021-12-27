@@ -11,8 +11,10 @@ APPLICATION_NAME = "Google Calendar API Python Quickstart"
 CLIENT_SECRET_FILE = "client_secret.json"
 SCOPES = "https://www.googleapis.com/auth/calendar.readonly"
 
+RUNNING_SUMMARY = "running"
+CYCLING_SUMMARY = "cycling"
+GYM_SUMMARY = "gym"
 # Events with colorcoding 'Flamingo'. 'Flamingo' is encoded as 4.
-RUNNING_SUMMARY = "Running"
 SPORT_COLOR = "4"
 
 
@@ -38,16 +40,26 @@ def get_credentials():
     return credentials
 
 
-def summary_filter(event):
-    return (
-        "summary" in event
-        and "description" in event
-        and event["summary"] == RUNNING_SUMMARY
-    )
+def get_summary_filter(summary):
+    def summary_filter(event):
+        # DIRT HACK
+        if summary == GYM_SUMMARY:
+            return (
+                "summary" in event
+                and event["summary"].lower() == summary
+            )
+        return (
+            "summary" in event
+            and "description" in event
+            and event["summary"].lower() == summary
+        )
+    return summary_filter
 
 
-def color_filter(event):
-    return "colorId" in event and event["colorId"] == SPORT_COLOR
+def get_color_filter(color):
+    def color_filter(event):
+        return "colorId" in event and event["colorId"] == color
+    return color_filter
 
 
 def get_events(timestamp_start, timestamp_end):
@@ -69,9 +81,10 @@ def get_events(timestamp_start, timestamp_end):
     return events_result.get("items", [])
 
 
-def get_filtered_events(timestamp_start, timestamp_end, filter_kind):
+def get_filtered_events(timestamp_start, timestamp_end, filter_kind, filter_value):
     events = get_events(timestamp_start, timestamp_end)
     if filter_kind == "summary":
-        return list(filter(summary_filter, events))
+        filter_function = get_summary_filter(summary=filter_value)
     elif filter_kind == "color":
-        return list(filter(color_filter, events))
+        filter_function = get_color_filter(color=filter_value)
+    return list(filter(filter_function, events))

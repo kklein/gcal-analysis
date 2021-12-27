@@ -7,8 +7,11 @@ def get_dataframe(events):
         "distance": map(
             lambda event: event.get("description", "").split("km")[0], events
         ),
+        "title": map(lambda event: event["summary"], events),
     }
     df = pd.DataFrame(data=d)
+    if len(df) == 0:
+        return df
     df["date"] = pd.to_datetime(df["date_string"].str[:16])
     df["week"] = df["date"].dt.isocalendar().week
     df["month"] = df["date"].dt.month
