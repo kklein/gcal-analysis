@@ -6,19 +6,20 @@ My use cases are:
  - Filtering the event titles for running indications and retrieving distance information from the event descriptions. Also, accumulate distances per week.
  - Filtering event colors for sport activity indications and counting the occurrences.
 
-Said use cases are explored by producing graphs via a python script, `analysis.py`, as well as producing an interactive d3 visualization in `index.html`.
+Said use cases are explored in a jupyter notebook, `investigation.ipynb`. 
 
-## Python script
+I once produced some interactive d3 visualization in `index.html` revolving around the same topic - this application is currently not tested.
 
-I followed [google's calendar quickstart in python](https://developers.google.com/google-apps/calendar/quickstart/python).
+## Python notebook
 
-Follow aforementioned guide and place a `client_secret.json` file in the root directory.
+Follow [google's calendar quickstart in python](https://developers.google.com/google-apps/calendar/quickstart/python).
+and place a `client_secret.json` in the root of this repository.
+ 
+After having created the environment specified in `environment.yml`, authenticate by running `authenticate.py`. When running this script for the first time, you'll be prompted to sign in with OAUTH2 in your browser. Once you've done this, it should no longer be necessary to repeat this step on your system.
 
-Run the script by executing `python analysis.py`. When running this script for the first time, you'll be prompted to sign in with OAUTH2 in your browser.
+Run `jupyter notebook` and open `investigation.ipynb`.
 
-I hope the code is fairly self-explanatory. :)
-
-## d3 visualization
+## d3 visualization [currently not tested]
 
 ### Features
 - Tooltip when hovering over individual datapoint.
