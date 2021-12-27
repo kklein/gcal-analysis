@@ -9,3 +9,4 @@ dependencies:
   - google-api-python-client
   - jupyter
   - pandas
+  - seaborn
