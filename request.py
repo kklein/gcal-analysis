@@ -46,11 +46,15 @@ def get_summary_filter(summary):
         if summary == GYM_SUMMARY:
             return (
                 "summary" in event
-                and event["summary"].lower() == summary
+                # Gym events can come as 'Gym', 'Gym:ub', 'Gym:lb', etc.
+                and event["summary"].lower().startswith(summary)
             )
         return (
             "summary" in event
             and "description" in event
+            # Running and Cycling events are excatly called that way.
+            # Some social, non-desired events are called 'Running w/ friend'
+            # and should not be considered.
             and event["summary"].lower() == summary
         )
     return summary_filter
