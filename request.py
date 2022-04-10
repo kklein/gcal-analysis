@@ -5,6 +5,8 @@ from apiclient import discovery
 from oauth2client import client, tools
 from oauth2client.file import Storage
 
+from functools import cache
+
 # If modifying these scopes, delete your previously saved credentials
 # at ~/.credentials/calendar-python-quickstart.json
 APPLICATION_NAME = "Google Calendar API Python Quickstart"
@@ -66,6 +68,7 @@ def get_color_filter(color):
     return color_filter
 
 
+@cache
 def get_events(timestamp_start, timestamp_end):
     credentials = get_credentials()
     http = credentials.authorize(httplib2.Http())
@@ -85,6 +88,7 @@ def get_events(timestamp_start, timestamp_end):
     return events_result.get("items", [])
 
 
+@cache
 def get_filtered_events(timestamp_start, timestamp_end, filter_kind, filter_value):
     events = get_events(timestamp_start, timestamp_end)
     if filter_kind == "summary":
